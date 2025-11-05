@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recipe API Test</title>
+</head>
+<body>
+    <h1>Recipe Database API Test</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testAPI() {
+            const results = document.getElementById('results');
+
+            try {
+                // Test database connection
+                results.innerHTML += '<h2>Testing Database API...</h2>';
+
+                const response = await fetch('/api/recipes.php');
+                const data = await response.json();
+
+                if (response.ok) {
+                    results.innerHTML += `<p>✅ Database API working! Found ${data.length} recipes.</p>`;
+                    results.innerHTML += '<h3>Recipes in Database:</h3>';
+                    results.innerHTML += '<ul>';
+                    data.forEach(recipe => {
+                        results.innerHTML += `<li>${recipe.title} (ID: ${recipe.recipeId})</li>`;
+                    });
+                    results.innerHTML += '</ul>';
+                } else {
+                    results.innerHTML += `<p>❌ API Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                results.innerHTML += `<p>❌ Connection Error: ${error.message}</p>`;
+                results.innerHTML += '<p>Make sure the API files are on your web server and accessible.</p>';
+            }
+        }
+
+        // Run test when page loads
+        testAPI();
+    </script>
+</body>
+</html>
