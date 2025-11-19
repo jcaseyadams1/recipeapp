@@ -43,14 +43,14 @@ body {
 @media (min-width: 1024px) {
     .container {
         max-width: 1200px;
-        padding: 30px 40px;
+        padding: 30px 40px 120px 40px;
     }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
     .container {
         max-width: 900px;
-        padding: 25px 30px;
+        padding: 25px 30px 120px 30px;
     }
 }
 
