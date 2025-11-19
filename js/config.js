@@ -34,7 +34,7 @@ export const CONFIG = {
 
     // Static configuration
     AIRTABLE_TABLE_NAME: 'Recipes',
-    ALLORIGINS_URL: 'https://api.allorigins.win/raw?url=',
+    ALLORIGINS_URL: '/api/proxy.php?url=',
     AIRTABLE_BASE_URL: 'https://api.airtable.com/v0',
 
     // UI Configuration
