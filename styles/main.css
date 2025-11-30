@@ -1231,13 +1231,19 @@ body {
 }
 
 /* Editable Content Styles */
-.editable-ingredient,
-.editable-step {
+.editable-ingredient {
     position: relative;
     padding: 8px;
     margin: 4px 0;
     border: 1px solid transparent;
     border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.editable-step {
+    /* Inherit padding from .step-item, only override non-left padding */
+    border: 1px solid transparent;
     cursor: pointer;
     transition: all 0.2s ease;
 }
