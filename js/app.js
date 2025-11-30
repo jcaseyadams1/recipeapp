@@ -167,11 +167,7 @@ class RecipeKeeperApp {
             const result = await this.storage.saveRecipe(recipe);
 
             if (result.success) {
-                if (result.airtableSaved) {
-                    this.ui.showSuccess('Recipe saved to your collection!');
-                } else {
-                    this.ui.showSuccess('Recipe saved locally!');
-                }
+                this.ui.showSuccess('Recipe saved to your collection!');
 
                 // Clear image upload UI after successful save
                 this.ui.clearImageUpload();
@@ -248,7 +244,7 @@ class RecipeKeeperApp {
             // Delete from storage using URL or recipeId
             const result = await this.storage.deleteRecipe(url, recipeId);
 
-            if (result.airtableDeleted || result.localDeleted) {
+            if (result.localDeleted) {
                 this.ui.showSuccess(`"${title}" deleted successfully`);
 
                 // Refresh the saved recipes view
@@ -660,66 +656,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return dbRecipes;
             } catch (error) {
                 console.error('Failed to load from database:', error);
-                return [];
-            }
-        };
-
-        // Add import function for Airtable TSV export
-        window.importAirtableExport = async () => {
-            try {
-                console.log('Reading Airtable export file...');
-
-                // Read the airtable_export.txt file
-                const response = await fetch('./airtable_export.txt');
-                if (!response.ok) {
-                    throw new Error('Could not read airtable_export.txt file');
-                }
-
-                const tsvContent = await response.text();
-                console.log('File loaded, size:', tsvContent.length, 'characters');
-
-                // Parse the TSV content
-                const importResult = await app.storage.importFromAirtableTSV(tsvContent);
-                console.log('Import result:', importResult);
-
-                if (importResult.success) {
-                    // Get current recipes count
-                    const currentRecipes = app.storage.getLocalRecipes();
-
-                    const confirm = window.confirm(
-                        `Found ${importResult.recipesFound} recipes in the Airtable export.\n` +
-                        `You currently have ${currentRecipes.length} recipes.\n\n` +
-                        `Click OK to import all recipes (this will add to your existing recipes).\n` +
-                        `Click Cancel to abort the import.`
-                    );
-
-                    if (confirm) {
-                        // Add all imported recipes to local storage
-                        for (const recipe of importResult.recipes) {
-                            await app.storage.saveToLocalStorage(recipe);
-                        }
-
-                        // Reload the recipes display
-                        await app.loadSavedRecipes();
-
-                        console.log(`Successfully imported ${importResult.recipesFound} recipes!`);
-                        console.log('Refresh the "My Recipes" page to see all imported recipes.');
-
-                        // Show success message
-                        app.ui.showSuccess(`Successfully imported ${importResult.recipesFound} recipes from Airtable export!`);
-
-                        return importResult.recipes;
-                    } else {
-                        console.log('Import cancelled by user');
-                        return [];
-                    }
-                } else {
-                    throw new Error('Import failed');
-                }
-
-            } catch (error) {
-                console.error('Failed to import Airtable export:', error);
-                app.ui.showError('Failed to import recipes: ' + error.message);
                 return [];
             }
         };

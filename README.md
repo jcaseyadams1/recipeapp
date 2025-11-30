@@ -36,7 +36,6 @@ The app features a clean, iOS-inspired interface with:
 
 ### Optional API Keys
 - **OpenAI API Key** - Required for photo/PDF OCR features
-- **Airtable API Key** - Alternative cloud storage option
 
 ## Installation
 
@@ -105,8 +104,6 @@ Edit `js/config.local.js` with your API keys:
 ```javascript
 export const LOCAL_CONFIG = {
     OPENAI_API_KEY: 'your-openai-api-key',  // For photo OCR
-    AIRTABLE_API_KEY: 'your-airtable-key',  // Optional
-    AIRTABLE_BASE_ID: 'your-base-id',       // Optional
 };
 ```
 
