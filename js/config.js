@@ -24,12 +24,33 @@ export const loadLocalConfig = async () => {
 };
 
 // Create CONFIG as a getter function that returns current configuration
+// Calculate base path from script location for reliable API paths
+const getBasePath = () => {
+    // Try to get base path from current script or document location
+    const scripts = document.getElementsByTagName('script');
+    for (const script of scripts) {
+        if (script.src && script.src.includes('/js/')) {
+            // Extract base path from script src (e.g., "/recipeapp/js/app.js" -> "/recipeapp/")
+            const match = script.src.match(/^(.*?)\/js\//);
+            if (match) {
+                return match[1] + '/';
+            }
+        }
+    }
+    // Fallback: use document location
+    const path = window.location.pathname;
+    const lastSlash = path.lastIndexOf('/');
+    return path.substring(0, lastSlash + 1);
+};
+
 export const CONFIG = {
     get CLAUDE_API_KEY() { return localConfig.CLAUDE_API_KEY; },
     get OPENAI_API_KEY() { return localConfig.OPENAI_API_KEY; },
 
-    // Static configuration - use relative path for subdirectory compatibility
-    ALLORIGINS_URL: 'api/proxy.php?url=',
+    // Dynamic configuration - calculate proxy URL based on page location
+    get ALLORIGINS_URL() {
+        return getBasePath() + 'api/proxy.php?url=';
+    },
 
     // UI Configuration
     MESSAGE_DISPLAY_DURATION: {
