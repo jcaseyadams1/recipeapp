@@ -1,0 +1,56 @@
+# Configuration files with API keys
+js/config.local.js
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files
+*.bak
+*.backup
+backups/
+
+# Data exports (may contain sensitive data)
+*.export
+exports/
+
+# Node modules (if using npm for tooling)
+node_modules/
+
+# PHP dependencies
+vendor/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Test and development files
+test-*.html
+test-*.php
+debug-*.html
+
+# Archive folder (development history)
+archive/
