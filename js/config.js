@@ -5,8 +5,6 @@
 
 // Default fallback configuration
 let localConfig = {
-    AIRTABLE_API_KEY: 'CONFIGURE_YOUR_AIRTABLE_KEY',
-    AIRTABLE_BASE_ID: 'CONFIGURE_YOUR_BASE_ID',
     CLAUDE_API_KEY: 'CONFIGURE_YOUR_CLAUDE_KEY',
     DEBUG_MODE: true
 };
@@ -28,14 +26,10 @@ export const loadLocalConfig = async () => {
 // Create CONFIG as a getter function that returns current configuration
 export const CONFIG = {
     get CLAUDE_API_KEY() { return localConfig.CLAUDE_API_KEY; },
-    get AIRTABLE_API_KEY() { return localConfig.AIRTABLE_API_KEY; },
-    get AIRTABLE_BASE_ID() { return localConfig.AIRTABLE_BASE_ID; },
     get OPENAI_API_KEY() { return localConfig.OPENAI_API_KEY; },
 
     // Static configuration
-    AIRTABLE_TABLE_NAME: 'Recipes',
     ALLORIGINS_URL: '/api/proxy.php?url=',
-    AIRTABLE_BASE_URL: 'https://api.airtable.com/v0',
 
     // UI Configuration
     MESSAGE_DISPLAY_DURATION: {
@@ -81,30 +75,11 @@ export const CONFIG = {
 export const validateConfig = () => {
     const errors = [];
 
-    if (!CONFIG.AIRTABLE_API_KEY || CONFIG.AIRTABLE_API_KEY === 'CONFIGURE_YOUR_AIRTABLE_KEY') {
-        errors.push('Airtable API key not configured');
-    }
-
-    if (!CONFIG.AIRTABLE_BASE_ID || CONFIG.AIRTABLE_BASE_ID === 'CONFIGURE_YOUR_BASE_ID') {
-        errors.push('Airtable Base ID not configured');
-    }
+    // Configuration validation - currently no required external services
+    // OpenAI key is optional (only needed for OCR features)
 
     return {
-        isValid: errors.length === 0,
+        isValid: true,
         errors
     };
-};
-
-export const RECIPE_FIELD_MAPPING = {
-    // Maps internal field names to Airtable field names
-    url: 'URL',
-    title: 'Title',
-    ingredients: 'Ingredients',
-    servings: 'Servings',
-    prepTime: 'Preparation Time (min)',
-    cookTime: 'Cooking Time (min)',
-    steps: 'Steps',
-    dateAdded: 'Date Added',
-    imageUrl: 'Thumbnail Image',
-    recipeId: 'recipeID'
 };

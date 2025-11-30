@@ -54,11 +54,6 @@ Required privileges:
 - Get your key at: https://platform.openai.com/api-keys
 - Estimated cost: ~$0.01-0.05 per image processed
 
-### Airtable API (Alternative Cloud Storage)
-- Optional alternative to MariaDB storage
-- Get your key at: https://airtable.com/create/tokens
-- Free tier supports up to 1,200 records
-
 ## Network Requirements
 
 ### Ports
@@ -69,7 +64,6 @@ Required privileges:
 The application makes outbound requests to:
 - Recipe websites (for extraction)
 - `api.openai.com` (for OCR, if configured)
-- `api.airtable.com` (if using Airtable storage)
 
 ## Installation Checklist
 

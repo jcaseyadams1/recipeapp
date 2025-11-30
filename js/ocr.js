@@ -935,7 +935,7 @@ ${extractedText}`
                 imageDataUrlForStorage = imageDataUrlForOCR;
             }
 
-            // Check if we need to compress further for storage (Airtable limits)
+            // Check if we need to compress further for storage
             const storageSize = this.estimateBase64Size(imageDataUrlForStorage);
             console.log('💾 Storage size estimate:', storageSize, 'bytes (', (storageSize/1024/1024).toFixed(2), 'MB)');
 

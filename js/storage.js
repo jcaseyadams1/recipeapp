@@ -1,14 +1,13 @@
 /**
  * Storage Module
- * Handles Airtable and local storage operations
+ * Handles MariaDB database and local storage operations
  */
 
-import { CONFIG, RECIPE_FIELD_MAPPING } from './config.js';
+import { CONFIG } from './config.js';
 import { AppError, ErrorTypes } from './utils.js';
 
 export class StorageManager {
     constructor() {
-        this.airtableUrl = `${CONFIG.AIRTABLE_BASE_URL}/${CONFIG.AIRTABLE_BASE_ID}/${CONFIG.AIRTABLE_TABLE_NAME}`;
         this.recipesFileName = 'recipes.json';
         this.backupDir = 'backups';
         this.apiUrl = '/recipeapp/api/recipes.php'; // Full absolute path
@@ -43,88 +42,8 @@ export class StorageManager {
 
         return {
             success: databaseSaved,
-            airtableSaved: false, // Keep for compatibility
             localSaved: databaseSaved,
             errors
-        };
-    }
-
-    /**
-     * Saves recipe to Airtable
-     * @param {Object} recipe - Recipe to save
-     * @returns {Promise<Object>} - Airtable response
-     */
-    async saveToAirtable(recipe) {
-        try {
-            // Clean and prepare recipe data for Airtable
-            const record = this.prepareRecipeForAirtable(recipe);
-
-            console.log('Saving to Airtable:', record);
-
-            const response = await fetch(this.airtableUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(record)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new AppError(
-                    errorData.error?.message || 'Failed to save to Airtable',
-                    ErrorTypes.API_ERROR,
-                    {
-                        status: response.status,
-                        statusText: response.statusText,
-                        errorData
-                    }
-                );
-            }
-
-            return await response.json();
-        } catch (error) {
-            if (error instanceof AppError) {
-                throw error;
-            }
-            throw new AppError(
-                'Network error saving to Airtable',
-                ErrorTypes.NETWORK_ERROR,
-                { originalError: error }
-            );
-        }
-    }
-
-    /**
-     * Prepares recipe data for Airtable format
-     * @param {Object} recipe - Recipe object
-     * @returns {Object} - Airtable record format
-     */
-    prepareRecipeForAirtable(recipe) {
-        // Ensure imageUrl is a string or empty
-        let thumbnailUrl = '';
-        if (recipe.imageUrl) {
-            if (typeof recipe.imageUrl === 'string') {
-                thumbnailUrl = recipe.imageUrl;
-            } else if (recipe.imageUrl.url) {
-                thumbnailUrl = recipe.imageUrl.url;
-            }
-        }
-
-        return {
-            fields: {
-                [RECIPE_FIELD_MAPPING.url]: recipe.url || '',
-                [RECIPE_FIELD_MAPPING.title]: recipe.title || 'Untitled Recipe',
-                [RECIPE_FIELD_MAPPING.ingredients]: JSON.stringify(recipe.ingredients || []),
-                [RECIPE_FIELD_MAPPING.servings]: parseInt(recipe.servings) || 1,
-                [RECIPE_FIELD_MAPPING.prepTime]: parseInt(recipe.prepTime) || 0,
-                [RECIPE_FIELD_MAPPING.cookTime]: parseInt(recipe.cookTime) || 0,
-                [RECIPE_FIELD_MAPPING.steps]: JSON.stringify(recipe.steps || []),
-                [RECIPE_FIELD_MAPPING.dateAdded]: new Date().toISOString().split('T')[0],
-                [RECIPE_FIELD_MAPPING.recipeId]: recipe.recipeId || '',
-                [RECIPE_FIELD_MAPPING.imageUrl]: thumbnailUrl || ''
-            }
         };
     }
 
@@ -316,79 +235,6 @@ export class StorageManager {
     }
 
     /**
-     * Import recipes from Airtable TSV export
-     * @param {string} tsvContent - TSV file content
-     * @returns {Promise<Object>} - Import results
-     */
-    async importFromAirtableTSV(tsvContent) {
-        try {
-            console.log('Parsing Airtable TSV export...');
-
-            const lines = tsvContent.split('\n');
-            const headers = lines[0].split('\t');
-
-            console.log('Found headers:', headers);
-            console.log('Total lines:', lines.length);
-
-            const recipes = [];
-            let currentRecipe = null;
-            let lineIndex = 1; // Start after header
-
-            while (lineIndex < lines.length) {
-                const line = lines[lineIndex].trim();
-                if (!line) {
-                    lineIndex++;
-                    continue;
-                }
-
-                const fields = line.split('\t');
-
-                // Check if this is a new recipe (has URL in first column or is a new record)
-                if (fields[0] && (fields[0].startsWith('http') || !currentRecipe)) {
-                    // Save previous recipe if exists
-                    if (currentRecipe) {
-                        recipes.push(this.convertAirtableRecipe(currentRecipe));
-                    }
-
-                    // Start new recipe
-                    currentRecipe = {};
-                    headers.forEach((header, index) => {
-                        currentRecipe[header] = fields[index] || '';
-                    });
-                } else {
-                    // This is a continuation of the previous recipe (multi-line)
-                    // Append to the last non-empty field
-                    for (let i = headers.length - 1; i >= 0; i--) {
-                        const header = headers[i];
-                        if (currentRecipe[header]) {
-                            currentRecipe[header] += '\n' + (fields[i] || '');
-                            break;
-                        }
-                    }
-                }
-
-                lineIndex++;
-            }
-
-            // Don't forget the last recipe
-            if (currentRecipe) {
-                recipes.push(this.convertAirtableRecipe(currentRecipe));
-            }
-
-            console.log(`Parsed ${recipes.length} recipes from Airtable export`);
-            return {
-                success: true,
-                recipesFound: recipes.length,
-                recipes: recipes
-            };
-
-        } catch (error) {
-            console.error('Failed to import from Airtable TSV:', error);
-            throw new AppError('Failed to parse Airtable export', ErrorTypes.STORAGE_ERROR, { originalError: error });
-        }
-    }
-
-    /**
      * Decode HTML entities in text
      * @param {string} text - Text containing HTML entities
      * @returns {string} - Decoded text
@@ -436,69 +282,6 @@ export class StorageManager {
     }
 
     /**
-     * Convert Airtable recipe format to local format
-     * @param {Object} airtableRecipe - Raw Airtable recipe data
-     * @returns {Object} - Converted recipe
-     */
-    convertAirtableRecipe(airtableRecipe) {
-        try {
-            const recipe = {
-                title: this.decodeHtmlEntities(airtableRecipe.Title) || 'Untitled Recipe',
-                url: airtableRecipe.URL || '',
-                recipeId: airtableRecipe.recipeID || `imported_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                servings: parseInt(airtableRecipe.Servings) || 1,
-                prepTime: parseInt(airtableRecipe['Preparation Time (min)']) || 0,
-                cookTime: parseInt(airtableRecipe['Cooking Time (min)']) || 0,
-                dateAdded: airtableRecipe['Date Added'] ? new Date(airtableRecipe['Date Added']).toISOString() : new Date().toISOString(),
-                sourceType: airtableRecipe.URL ? 'url' : 'ocr'
-            };
-
-            // Parse ingredients
-            try {
-                const ingredientsText = airtableRecipe.Ingredients || '[]';
-                const rawIngredients = JSON.parse(ingredientsText);
-
-                // Decode HTML entities in ingredient text
-                recipe.ingredients = rawIngredients.map(ingredient => ({
-                    amount: this.decodeHtmlEntities(ingredient.amount || ''),
-                    unit: this.decodeHtmlEntities(ingredient.unit || ''),
-                    item: this.decodeHtmlEntities(ingredient.item || '')
-                }));
-            } catch (error) {
-                console.warn('Failed to parse ingredients for', recipe.title, error);
-                recipe.ingredients = [];
-            }
-
-            // Parse steps
-            try {
-                const stepsText = airtableRecipe.Steps || '[]';
-                let steps = JSON.parse(stepsText);
-
-                // Convert steps to proper format and decode HTML entities
-                recipe.steps = steps.map((step, index) => ({
-                    text: this.decodeHtmlEntities(step),
-                    completed: false
-                }));
-            } catch (error) {
-                console.warn('Failed to parse steps for', recipe.title, error);
-                recipe.steps = [];
-            }
-
-            // Add thumbnail if available
-            if (airtableRecipe['Thumbnail Image']) {
-                recipe.thumbnailUrl = airtableRecipe['Thumbnail Image'];
-            }
-
-            console.log('Converted recipe:', recipe.title, '- Ingredients:', recipe.ingredients.length, 'Steps:', recipe.steps.length);
-            return recipe;
-
-        } catch (error) {
-            console.error('Failed to convert recipe:', airtableRecipe.Title, error);
-            throw error;
-        }
-    }
-
-    /**
      * Prepares recipe for local storage
      * @param {Object} recipe - Recipe object
      * @returns {Object} - Cleaned recipe
@@ -527,7 +310,7 @@ export class StorageManager {
         } catch (error) {
             console.error('❌ DATABASE FAILED, trying localStorage fallback:', error);
 
-            // Fallback to localStorage only (not Airtable)
+            // Fallback to localStorage
             try {
                 const localRecipes = this.getLocalRecipesFromStorage();
                 console.log(`⚠️ FALLBACK: loaded ${localRecipes.length} recipes from localStorage`);
@@ -541,75 +324,6 @@ export class StorageManager {
                 return [];
             }
         }
-    }
-
-    /**
-     * Loads recipes from Airtable
-     * @returns {Promise<Array>} - Array of recipes
-     */
-    async loadFromAirtable() {
-        try {
-            const sortParam = encodeURIComponent('Date Added');
-            const response = await fetch(
-                `${this.airtableUrl}?sort[0][field]=${sortParam}&sort[0][direction]=desc`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`
-                    }
-                }
-            );
-
-            if (!response.ok) {
-                throw new AppError(
-                    `Failed to load from Airtable: ${response.status}`,
-                    ErrorTypes.API_ERROR
-                );
-            }
-
-            const data = await response.json();
-            console.log('Raw Airtable response:', data);
-            console.log('Number of records from Airtable:', data.records.length);
-
-            const parsedRecords = data.records.map(record => {
-                console.log('Parsing Airtable record:', record.id, record.fields);
-                return this.parseAirtableRecord(record);
-            });
-
-            console.log('Parsed Airtable records:', parsedRecords);
-            return parsedRecords;
-        } catch (error) {
-            if (error instanceof AppError) {
-                throw error;
-            }
-            throw new AppError(
-                'Network error loading from Airtable',
-                ErrorTypes.NETWORK_ERROR,
-                { originalError: error }
-            );
-        }
-    }
-
-    /**
-     * Parses Airtable record to recipe format
-     * @param {Object} record - Airtable record
-     * @returns {Object} - Recipe object
-     */
-    parseAirtableRecord(record) {
-        const fields = record.fields;
-
-        return {
-            id: record.id,
-            url: fields[RECIPE_FIELD_MAPPING.url] || '',
-            title: fields[RECIPE_FIELD_MAPPING.title] || 'Untitled Recipe',
-            ingredients: this.safeJsonParse(fields[RECIPE_FIELD_MAPPING.ingredients], []),
-            servings: fields[RECIPE_FIELD_MAPPING.servings] || 1,
-            prepTime: fields[RECIPE_FIELD_MAPPING.prepTime] || 0,
-            cookTime: fields[RECIPE_FIELD_MAPPING.cookTime] || 0,
-            steps: this.safeJsonParse(fields[RECIPE_FIELD_MAPPING.steps], []),
-            imageUrl: fields[RECIPE_FIELD_MAPPING.imageUrl] || null,
-            dateAdded: fields[RECIPE_FIELD_MAPPING.dateAdded] || new Date().toISOString(),
-            recipeId: fields[RECIPE_FIELD_MAPPING.recipeId] || ''
-        };
     }
 
     /**
@@ -767,7 +481,6 @@ export class StorageManager {
         console.log('deleteRecipe called with URL:', recipeUrl, 'Recipe ID:', recipeId);
 
         const results = {
-            airtableDeleted: false,
             localDeleted: false,
             errors: []
         };
@@ -796,29 +509,6 @@ export class StorageManager {
 
         console.log('Delete results:', results);
         return results;
-    }
-
-    /**
-     * Deletes recipe from Airtable
-     * @param {string} recordId - Airtable record ID
-     * @returns {Promise<Object>} - Delete response
-     */
-    async deleteFromAirtable(recordId) {
-        const response = await fetch(`${this.airtableUrl}/${recordId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new AppError(
-                `Failed to delete from Airtable: ${response.status}`,
-                ErrorTypes.API_ERROR
-            );
-        }
-
-        return await response.json();
     }
 
     /**
@@ -886,7 +576,6 @@ export class StorageManager {
             results.errors.push(`Local storage clear failed: ${error.message}`);
         }
 
-        // Note: We don't automatically clear Airtable for safety
         return results;
     }
 }
