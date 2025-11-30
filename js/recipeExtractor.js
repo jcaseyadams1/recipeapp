@@ -90,18 +90,30 @@ export class RecipeExtractor {
     }
 
     /**
-     * Fetches webpage content using AllOrigins API
+     * Fetches webpage content using proxy API
      * @param {string} url - URL to fetch
      * @returns {Promise<string>} - HTML content
      */
     async fetchWebpage(url) {
         try {
-            const allOriginsUrl = `${CONFIG.ALLORIGINS_URL}${encodeURIComponent(url)}`;
-            const response = await fetch(allOriginsUrl);
+            const proxyUrl = `${CONFIG.ALLORIGINS_URL}${encodeURIComponent(url)}`;
+            console.log('Fetching via proxy:', proxyUrl);
+
+            const response = await fetch(proxyUrl);
 
             if (!response.ok) {
+                // Try to get error message from response
+                let errorMsg = `HTTP ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData.error) {
+                        errorMsg = errorData.error;
+                    }
+                } catch (e) {
+                    errorMsg = `${response.status} ${response.statusText}`;
+                }
                 throw new AppError(
-                    `Failed to fetch webpage: ${response.status} ${response.statusText}`,
+                    `Failed to fetch webpage: ${errorMsg}`,
                     ErrorTypes.NETWORK_ERROR
                 );
             }
@@ -111,8 +123,9 @@ export class RecipeExtractor {
             if (error instanceof AppError) {
                 throw error;
             }
+            console.error('Fetch error:', error);
             throw new AppError(
-                'Network error while fetching webpage',
+                `Network error: ${error.message || 'Check your Internet connection'}`,
                 ErrorTypes.NETWORK_ERROR,
                 { originalError: error }
             );
