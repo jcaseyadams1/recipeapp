@@ -17,11 +17,37 @@ A full-featured web application for saving, organizing, and managing your favori
 
 ## Screenshots
 
-The app features a clean, iOS-inspired interface with:
-- Home view for adding new recipes
-- Recipe card with adjustable servings
-- My Recipes collection with search
-- Detailed cooking instructions view
+The app features a clean, iOS-inspired interface:
+
+| Home | Recipe Card | My Recipes | Instructions |
+|:----:|:-----------:|:----------:|:------------:|
+| ![Home](screenshots/home.png) | ![Recipe Card](screenshots/recipe-card.png) | ![My Recipes](screenshots/my-recipes.png) | ![Instructions](screenshots/instructions.png) |
+| Add recipes from URL or photo | View with adjustable servings | Search your collection | Step-by-step cooking mode |
+
+<details>
+<summary>More Screenshots</summary>
+
+### Home View
+![Home View](screenshots/home.png)
+
+*Paste a recipe URL or upload a photo to extract recipes automatically*
+
+### Recipe Card
+![Recipe Card](screenshots/recipe-card.png)
+
+*View ingredients and adjust serving sizes with automatic scaling*
+
+### My Recipes Collection
+![My Recipes](screenshots/my-recipes.png)
+
+*Browse and search your saved recipes*
+
+### Cooking Instructions
+![Instructions](screenshots/instructions.png)
+
+*Follow step-by-step instructions with progress tracking*
+
+</details>
 
 ## Requirements
 
