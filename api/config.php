@@ -14,7 +14,7 @@ $host = 'localhost';
 $port = 3306;
 $dbname = 'recipe_db';  // Change this to your database name
 $username = 'recipeapp';  // Change this to your database user
-$password = 'M&rcySu31594';  // Change this to your database password
+$password = 'Your password here';  // Change this to your database password
 
 try {
     $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
