@@ -28,8 +28,8 @@ export const CONFIG = {
     get CLAUDE_API_KEY() { return localConfig.CLAUDE_API_KEY; },
     get OPENAI_API_KEY() { return localConfig.OPENAI_API_KEY; },
 
-    // Static configuration
-    ALLORIGINS_URL: '/api/proxy.php?url=',
+    // Static configuration - use relative path for subdirectory compatibility
+    ALLORIGINS_URL: 'api/proxy.php?url=',
 
     // UI Configuration
     MESSAGE_DISPLAY_DURATION: {
