@@ -151,8 +151,30 @@ export class RecipeExtractor {
         const jsonLdRecipe = this.extractFromJsonLd(htmlContent);
         if (jsonLdRecipe) {
             Object.assign(recipe, jsonLdRecipe);
-            if (recipe.ingredients.length > 0 || recipe.steps.length > 0) {
+            if (recipe.ingredients.length > 0 && recipe.steps.length > 0) {
                 console.log('Successfully extracted from JSON-LD');
+                return recipe;
+            }
+        }
+
+        // Try microdata extraction second
+        const microdataRecipe = this.extractFromMicrodata(htmlContent);
+        if (microdataRecipe) {
+            // Merge microdata with existing recipe (fill gaps)
+            if (microdataRecipe.title && recipe.title.startsWith('Recipe from')) {
+                recipe.title = microdataRecipe.title;
+            }
+            if (microdataRecipe.ingredients?.length > 0 && recipe.ingredients.length === 0) {
+                recipe.ingredients = microdataRecipe.ingredients;
+            }
+            if (microdataRecipe.steps?.length > 0 && recipe.steps.length === 0) {
+                recipe.steps = microdataRecipe.steps;
+            }
+            if (microdataRecipe.imageUrl && !recipe.imageUrl) {
+                recipe.imageUrl = microdataRecipe.imageUrl;
+            }
+            if (recipe.ingredients.length > 0 && recipe.steps.length > 0) {
+                console.log('Successfully extracted from microdata');
                 return recipe;
             }
         }
@@ -173,6 +195,53 @@ export class RecipeExtractor {
 
         console.log('Local extraction completed:', recipe.title);
         return recipe;
+    }
+
+    /**
+     * Extracts recipe data from microdata (itemprop attributes)
+     * @param {string} htmlContent - HTML content
+     * @returns {Object|null} - Extracted recipe data or null
+     */
+    extractFromMicrodata(htmlContent) {
+        const recipe = {};
+
+        // Extract title from itemprop="name"
+        const titleMatch = htmlContent.match(/<[^>]*itemprop=["']name["'][^>]*>([^<]+)</i) ||
+                          htmlContent.match(/<[^>]*itemprop=["']name["'][^>]*content=["']([^"']+)["']/i);
+        if (titleMatch) {
+            recipe.title = this.decodeHtmlEntities(titleMatch[1].trim());
+        }
+
+        // Extract ingredients from itemprop="recipeIngredient" or "ingredients"
+        const ingredientMatches = [
+            ...htmlContent.matchAll(/<[^>]*itemprop=["'](?:recipeIngredient|ingredients)["'][^>]*>([^<]*)</gi),
+            ...htmlContent.matchAll(/<[^>]*itemprop=["'](?:recipeIngredient|ingredients)["'][^>]*content=["']([^"']+)["']/gi)
+        ];
+        if (ingredientMatches.length > 0) {
+            recipe.ingredients = ingredientMatches
+                .map(m => this.decodeHtmlEntities(m[1].trim()))
+                .filter(text => text.length > 2)
+                .map(text => this.parseIngredientText(text));
+        }
+
+        // Extract instructions from itemprop="recipeInstructions"
+        const instructionMatches = [
+            ...htmlContent.matchAll(/<[^>]*itemprop=["']recipeInstructions["'][^>]*>([\s\S]*?)<\/[^>]+>/gi)
+        ];
+        if (instructionMatches.length > 0) {
+            recipe.steps = instructionMatches
+                .map(m => this.decodeHtmlEntities(m[1].replace(/<[^>]*>/g, ' ').trim()))
+                .filter(text => text.length > 5);
+        }
+
+        // Extract image from itemprop="image"
+        const imageMatch = htmlContent.match(/<img[^>]*itemprop=["']image["'][^>]*src=["']([^"']+)["']/i) ||
+                          htmlContent.match(/<[^>]*itemprop=["']image["'][^>]*content=["']([^"']+)["']/i);
+        if (imageMatch) {
+            recipe.imageUrl = imageMatch[1];
+        }
+
+        return (recipe.ingredients?.length > 0 || recipe.steps?.length > 0) ? recipe : null;
     }
 
     /**
@@ -383,23 +452,78 @@ export class RecipeExtractor {
 
     /**
      * Parses instructions from JSON-LD
-     * @param {Array} instructions - Raw instructions array
+     * @param {Array|string} instructions - Raw instructions (array or string)
      * @returns {Array} - Parsed instructions
      */
     parseInstructions(instructions) {
-        return instructions
-            .map(inst => {
-                let text = '';
-                if (typeof inst === 'string') text = inst.trim();
-                else if (inst.text) text = inst.text.trim();
-                else if (inst.name) text = inst.name.trim();
-                else if (inst['@type'] === 'HowToStep' && inst.text) text = inst.text.trim();
-                else if (inst.instruction) text = inst.instruction.trim();
-                else if (inst.description) text = inst.description.trim();
+        // Handle string instructions (some sites put all steps in one string)
+        if (typeof instructions === 'string') {
+            return instructions
+                .split(/\n|(?:\d+\.\s)/)
+                .map(s => this.decodeHtmlEntities(s.trim()))
+                .filter(s => s.length > 5);
+        }
 
-                return this.decodeHtmlEntities(text);
-            })
-            .filter(step => step.length > 0);
+        if (!Array.isArray(instructions)) {
+            return [];
+        }
+
+        const steps = [];
+
+        for (const inst of instructions) {
+            // Handle HowToSection (contains nested steps)
+            if (inst['@type'] === 'HowToSection') {
+                // Extract steps from within the section
+                if (inst.itemListElement && Array.isArray(inst.itemListElement)) {
+                    for (const item of inst.itemListElement) {
+                        const text = this.extractStepText(item);
+                        if (text) steps.push(text);
+                    }
+                }
+                // Some sites use 'steps' instead of 'itemListElement'
+                if (inst.steps && Array.isArray(inst.steps)) {
+                    for (const item of inst.steps) {
+                        const text = this.extractStepText(item);
+                        if (text) steps.push(text);
+                    }
+                }
+            } else {
+                // Handle direct step
+                const text = this.extractStepText(inst);
+                if (text) steps.push(text);
+            }
+        }
+
+        return steps;
+    }
+
+    /**
+     * Extracts text from a single instruction step
+     * @param {Object|string} inst - Instruction object or string
+     * @returns {string} - Step text
+     */
+    extractStepText(inst) {
+        let text = '';
+        if (typeof inst === 'string') {
+            text = inst.trim();
+        } else if (inst.text) {
+            text = inst.text.trim();
+        } else if (inst.name && inst['@type'] === 'HowToStep') {
+            // Some sites put the instruction in 'name' when 'text' is missing
+            text = inst.name.trim();
+        } else if (inst.description) {
+            text = inst.description.trim();
+        } else if (inst.instruction) {
+            text = inst.instruction.trim();
+        } else if (inst.item?.text) {
+            // Handle itemListElement wrapper
+            text = inst.item.text.trim();
+        }
+
+        // Strip HTML tags that might be in the text
+        text = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+        return text.length > 0 ? this.decodeHtmlEntities(text) : '';
     }
 
     /**
@@ -452,23 +576,104 @@ export class RecipeExtractor {
      */
     extractIngredientsFromHtml(htmlContent, recipe) {
         const ingredientPatterns = [
+            // Standard patterns
             /<li[^>]*class="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
             /<li[^>]*itemprop="recipeIngredient"[^>]*>([\s\S]*?)<\/li>/gi,
+            // AllRecipes patterns
+            /<span[^>]*data-ingredient-name="true"[^>]*>([\s\S]*?)<\/span>/gi,
+            /<li[^>]*class="[^"]*mntl-structured-ingredients__list-item[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            // Food Network patterns
+            /<span[^>]*class="[^"]*o-Ingredients__a-Ingredient[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+            // Epicurious / Bon Appetit patterns
+            /<div[^>]*class="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+            // Tasty patterns
+            /<li[^>]*class="[^"]*xs-mb1[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            // BBC Good Food patterns
+            /<li[^>]*class="[^"]*pb-xxs[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            // Generic patterns (broader matching)
             /<span[^>]*class="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
-            /<p[^>]*class="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/p>/gi
+            /<p[^>]*class="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
+            // Data attribute patterns
+            /<[^>]*data-ingredient[^>]*>([\s\S]*?)<\/[^>]+>/gi,
+            // Checkbox label patterns (common in modern recipe sites)
+            /<label[^>]*class="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/label>/gi
         ];
 
         for (const pattern of ingredientPatterns) {
             const matches = [...htmlContent.matchAll(pattern)];
             for (const match of matches) {
-                const text = this.decodeHtmlEntities(match[1].replace(/<[^>]*>/g, '').trim());
-                if (text && text.length > 2) {
+                const text = this.cleanExtractedText(match[1]);
+                if (text && text.length > 2 && !this.isBoilerplateText(text)) {
                     const parsed = this.parseIngredientText(text);
                     recipe.ingredients.push(parsed);
                 }
             }
-            if (recipe.ingredients.length > 0) break;
+            if (recipe.ingredients.length > 2) break; // Need at least 3 ingredients
         }
+
+        // Try extracting from ingredient lists if still empty
+        if (recipe.ingredients.length === 0) {
+            this.extractIngredientsFromLists(htmlContent, recipe);
+        }
+    }
+
+    /**
+     * Extracts ingredients from unordered/ordered lists with ingredient-related classes
+     * @param {string} htmlContent - HTML content
+     * @param {Object} recipe - Recipe object
+     */
+    extractIngredientsFromLists(htmlContent, recipe) {
+        // Find lists that are likely ingredient lists
+        const listPatterns = [
+            /<ul[^>]*class="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi,
+            /<ul[^>]*id="[^"]*ingredient[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi,
+            /<div[^>]*class="[^"]*ingredient[^"]*"[^>]*>[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/gi
+        ];
+
+        for (const listPattern of listPatterns) {
+            const listMatches = [...htmlContent.matchAll(listPattern)];
+            for (const listMatch of listMatches) {
+                const liMatches = [...listMatch[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
+                for (const liMatch of liMatches) {
+                    const text = this.cleanExtractedText(liMatch[1]);
+                    if (text && text.length > 2 && !this.isBoilerplateText(text)) {
+                        recipe.ingredients.push(this.parseIngredientText(text));
+                    }
+                }
+                if (recipe.ingredients.length > 2) return;
+            }
+        }
+    }
+
+    /**
+     * Cleans extracted text by removing HTML and normalizing whitespace
+     * @param {string} text - Raw extracted text
+     * @returns {string} - Cleaned text
+     */
+    cleanExtractedText(text) {
+        if (!text) return '';
+        return this.decodeHtmlEntities(
+            text
+                .replace(/<[^>]*>/g, ' ')  // Remove HTML tags
+                .replace(/\s+/g, ' ')       // Normalize whitespace
+                .trim()
+        );
+    }
+
+    /**
+     * Checks if text is likely boilerplate (ads, buttons, etc.)
+     * @param {string} text - Text to check
+     * @returns {boolean} - True if boilerplate
+     */
+    isBoilerplateText(text) {
+        const lower = text.toLowerCase();
+        const boilerplatePatterns = [
+            /^(advertisement|sponsored|subscribe|sign up|log in|print|share|save|pin|email)/i,
+            /^(jump to|skip to|view|see|read more|click|tap)/i,
+            /^\d+\s*(comments?|reviews?|ratings?)/i,
+            /^(nutrition|calories|serving size)/i
+        ];
+        return boilerplatePatterns.some(p => p.test(lower)) || text.length > 500;
     }
 
     /**
@@ -501,41 +706,84 @@ export class RecipeExtractor {
         const stepPatterns = [
             // AllRecipes specific patterns
             /<li[^>]*data-testid="instruction-text"[^>]*>([\s\S]*?)<\/li>/gi,
-            /<p[^>]*class="[^"]*recipe-summary__item[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
+            /<p[^>]*class="[^"]*mntl-sc-block-html[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
             /<div[^>]*class="[^"]*recipe-instruction[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+            // Food Network patterns
+            /<li[^>]*class="[^"]*o-Method__m-Step[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            // Epicurious / Bon Appetit / Serious Eats patterns
+            /<p[^>]*class="[^"]*instruction[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
+            /<div[^>]*class="[^"]*step-instruction[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+            // NYT Cooking patterns
+            /<li[^>]*class="[^"]*recipe-steps[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            // BBC Good Food patterns
+            /<li[^>]*class="[^"]*method-steps[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            // Tasty patterns
+            /<li[^>]*class="[^"]*prep-steps[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
             // Generic patterns
             /<li[^>]*class="[^"]*instruction[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            /<li[^>]*class="[^"]*direction[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
+            /<li[^>]*class="[^"]*step[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
             /<li[^>]*itemprop="recipeInstructions"[^>]*>([\s\S]*?)<\/li>/gi,
             /<div[^>]*class="[^"]*direction[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
             /<div[^>]*class="[^"]*step[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-            /<p[^>]*class="[^"]*instruction[^"]*"[^>]*>([\s\S]*?)<\/p>/gi,
-            // Ordered list patterns
-            /<ol[^>]*class="[^"]*instructions[^"]*"[^>]*>[\s\S]*?<\/ol>/gi
+            // Data attribute patterns
+            /<[^>]*data-instruction[^>]*>([\s\S]*?)<\/[^>]+>/gi
         ];
 
         for (const pattern of stepPatterns) {
-            if (pattern.source.includes('<ol')) {
-                // Handle ordered list extraction
-                const olMatch = htmlContent.match(pattern);
-                if (olMatch) {
-                    const liMatches = [...olMatch[0].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
-                    for (const liMatch of liMatches) {
-                        const text = this.decodeHtmlEntities(liMatch[1].replace(/<[^>]*>/g, '').trim());
-                        if (text && text.length > 10) {
-                            recipe.steps.push(text);
-                        }
-                    }
+            const matches = [...htmlContent.matchAll(pattern)];
+            for (const match of matches) {
+                const text = this.cleanExtractedText(match[1]);
+                if (text && text.length > 15 && !this.isBoilerplateText(text)) {
+                    recipe.steps.push(text);
                 }
-            } else {
-                const matches = [...htmlContent.matchAll(pattern)];
-                for (const match of matches) {
-                    const text = this.decodeHtmlEntities(match[1].replace(/<[^>]*>/g, '').trim());
-                    if (text && text.length > 10) {
+            }
+            if (recipe.steps.length > 1) break; // Need at least 2 steps
+        }
+
+        // Try extracting from instruction lists if still empty
+        if (recipe.steps.length === 0) {
+            this.extractStepsFromLists(htmlContent, recipe);
+        }
+    }
+
+    /**
+     * Extracts steps from ordered/unordered lists with instruction-related classes
+     * @param {string} htmlContent - HTML content
+     * @param {Object} recipe - Recipe object
+     */
+    extractStepsFromLists(htmlContent, recipe) {
+        // Find lists that are likely instruction lists
+        const listPatterns = [
+            /<ol[^>]*class="[^"]*(?:instruction|direction|method|step|recipe)[^"]*"[^>]*>([\s\S]*?)<\/ol>/gi,
+            /<ol[^>]*id="[^"]*(?:instruction|direction|method|step)[^"]*"[^>]*>([\s\S]*?)<\/ol>/gi,
+            /<ul[^>]*class="[^"]*(?:instruction|direction|method|step)[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi,
+            /<div[^>]*class="[^"]*(?:instruction|direction|method)[^"]*"[^>]*>[\s\S]*?<ol[^>]*>([\s\S]*?)<\/ol>/gi
+        ];
+
+        for (const listPattern of listPatterns) {
+            const listMatches = [...htmlContent.matchAll(listPattern)];
+            for (const listMatch of listMatches) {
+                const liMatches = [...listMatch[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
+                for (const liMatch of liMatches) {
+                    const text = this.cleanExtractedText(liMatch[1]);
+                    if (text && text.length > 15 && !this.isBoilerplateText(text)) {
                         recipe.steps.push(text);
                     }
                 }
+                if (recipe.steps.length > 1) return;
             }
-            if (recipe.steps.length > 0) break;
+        }
+
+        // Last resort: look for numbered paragraphs
+        if (recipe.steps.length === 0) {
+            const numberedSteps = [...htmlContent.matchAll(/<p[^>]*>\s*(?:Step\s*)?\d+[.:]\s*([\s\S]*?)<\/p>/gi)];
+            for (const match of numberedSteps) {
+                const text = this.cleanExtractedText(match[1]);
+                if (text && text.length > 15 && !this.isBoilerplateText(text)) {
+                    recipe.steps.push(text);
+                }
+            }
         }
     }
 
