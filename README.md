@@ -46,37 +46,14 @@ git clone https://github.com/yourusername/recipeapp.git
 cd recipeapp
 ```
 
-### 2. Database Setup
+### 2. Create Database User
 
-Create a MariaDB database and user:
+Create a MySQL/MariaDB user for the application:
 
 ```sql
-CREATE DATABASE recipe_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
 CREATE USER 'recipeapp'@'localhost' IDENTIFIED BY 'your_secure_password';
 GRANT ALL PRIVILEGES ON recipe_db.* TO 'recipeapp'@'localhost';
 FLUSH PRIVILEGES;
-```
-
-Create the recipes table:
-
-```sql
-USE recipe_db;
-
-CREATE TABLE recipes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    recipeId VARCHAR(255) UNIQUE,
-    url TEXT,
-    title VARCHAR(500),
-    servings INT DEFAULT 4,
-    prepTime INT DEFAULT 0,
-    cookTime INT DEFAULT 0,
-    ingredients JSON,
-    steps JSON,
-    imageUrl TEXT,
-    dateAdded TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    dateModified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
 ```
 
 ### 3. Configure Database Connection
@@ -91,12 +68,24 @@ $username = 'recipeapp';
 $password = 'your_secure_password';
 ```
 
-### 4. Configure API Keys (Optional)
+Also update the same credentials at the top of `api/setup.php`.
 
-Copy and edit the local configuration file:
+### 4. Run Database Setup
+
+Visit `http://your-server/recipeapp/api/setup.php` in your browser.
+
+This will automatically:
+- Create the `recipe_db` database if it doesn't exist
+- Create the `recipes` table with proper structure
+- Add a sample recipe ("Classic Chocolate Chip Cookies")
+- Verify the installation
+
+### 5. Configure API Keys (Optional)
+
+Create a local configuration file for OCR features:
 
 ```bash
-cp js/config.local.js js/config.local.js.bak
+cp js/config.local.example.js js/config.local.js
 ```
 
 Edit `js/config.local.js` with your API keys:
@@ -107,14 +96,38 @@ export const LOCAL_CONFIG = {
 };
 ```
 
-### 5. Deploy to Web Server
+### 6. Deploy to Web Server
 
 Copy all files to your web server's document root or a subdirectory.
 
-### 6. Verify Installation
+### 7. Start Using
 
-1. Visit `http://your-server/recipeapp/api/setup.php` to verify database connection
-2. Open `http://your-server/recipeapp/` to use the app
+Open `http://your-server/recipeapp/` in your browser. You should see the sample recipe in "My Recipes"!
+
+## Database Schema
+
+The recipes table structure (created automatically by setup.php):
+
+```sql
+CREATE TABLE recipes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    recipeId VARCHAR(255) NOT NULL UNIQUE,
+    url TEXT,
+    title VARCHAR(500) NOT NULL,
+    servings INT DEFAULT 4,
+    prepTime INT DEFAULT 0,
+    cookTime INT DEFAULT 0,
+    ingredients JSON,
+    steps JSON,
+    imageUrl LONGTEXT,
+    extractedText TEXT,
+    originalImageName VARCHAR(255),
+    dateAdded TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    dateModified TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_title (title(100)),
+    INDEX idx_dateAdded (dateAdded)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
 
 ## Usage
 
@@ -151,7 +164,6 @@ recipeapp/
 ├── index.html              # Main application entry point
 ├── README.md               # This file
 ├── LICENSE                 # MIT License
-├── DATABASE_MIGRATION.md   # Database migration guide
 ├── .gitignore              # Git ignore rules
 │
 ├── js/                     # Frontend JavaScript modules
@@ -168,9 +180,8 @@ recipeapp/
 │   ├── config.php          # Database configuration
 │   ├── recipes.php         # REST API endpoints
 │   ├── proxy.php           # CORS proxy for recipe URLs
-│   ├── setup.php           # Database verification
-│   ├── backup.php          # Backup functionality
-│   └── migrate.php         # Data migration utilities
+│   ├── setup.php           # Database setup & verification
+│   └── backup.php          # Backup functionality
 │
 ├── styles/
 │   └── main.css            # Application styles
