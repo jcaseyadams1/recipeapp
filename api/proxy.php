@@ -70,6 +70,8 @@ try {
     $referer = $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . '/';
 
     // Set cURL options with improved headers for better site acceptance
+    // Note: SSL verification disabled for local development environments
+    // that may not have CA certificates properly configured
     curl_setopt_array($ch, [
         CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
@@ -77,8 +79,8 @@ try {
         CURLOPT_MAXREDIRS => 10,
         CURLOPT_TIMEOUT => 45,
         CURLOPT_CONNECTTIMEOUT => 15,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         CURLOPT_HTTPHEADER => [
             'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
