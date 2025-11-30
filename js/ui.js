@@ -1041,17 +1041,8 @@ export class UIController {
      * @returns {string} - Title HTML
      */
     generateTitleHtml(recipe) {
-        const isOCRRecipe = this.currentRecipe && !this.currentRecipe.url && this.currentRecipe.recipeId;
-        const hasUrl = this.currentRecipe && this.currentRecipe.url && this.currentRecipe.url.trim().length > 0;
-
-        // Allow editing for OCR recipes (both fresh and saved), but not for URL-based recipes
-        if (isOCRRecipe || (!hasUrl && this.isRecipeFromSaved)) {
-            // Editable version for OCR recipes (fresh or saved)
-            return `<h2 class="recipe-title editable-title" data-action="edit-title">${this.escapeHtml(recipe.title)}</h2>`;
-        } else {
-            // Regular version for URL-based recipes
-            return `<h2 class="recipe-title">${this.escapeHtml(recipe.title)}</h2>`;
-        }
+        // All recipes are editable - tap to edit title
+        return `<h2 class="recipe-title editable-title" data-action="edit-title">${this.escapeHtml(recipe.title)}</h2>`;
     }
 
     /**
@@ -1060,27 +1051,14 @@ export class UIController {
      * @returns {string} - Meta HTML
      */
     generateMetaHtml(recipe) {
-        const isOCRRecipe = this.currentRecipe && !this.currentRecipe.url && this.currentRecipe.recipeId;
-        const hasUrl = this.currentRecipe && this.currentRecipe.url && this.currentRecipe.url.trim().length > 0;
-
-        // Allow editing for OCR recipes (both fresh and saved), but not for URL-based recipes
-        if (isOCRRecipe || (!hasUrl && this.isRecipeFromSaved)) {
-            return `
-                <div class="recipe-meta">
-                    <div class="recipe-meta-item editable-meta" data-action="edit-prep-time">⏱️ Prep: ${recipe.prepTime || 0} min</div>
-                    <div class="recipe-meta-item editable-meta" data-action="edit-cook-time">🔥 Cook: ${recipe.cookTime || 0} min</div>
-                    <div class="recipe-meta-item editable-meta" data-action="edit-servings">🍽️ Servings: ${recipe.servings || 1}</div>
-                </div>
-            `;
-        } else {
-            return `
-                <div class="recipe-meta">
-                    <div class="recipe-meta-item">⏱️ Prep: ${recipe.prepTime || 0} min</div>
-                    <div class="recipe-meta-item">🔥 Cook: ${recipe.cookTime || 0} min</div>
-                    <div class="recipe-meta-item">🍽️ Servings: ${recipe.servings || 1}</div>
-                </div>
-            `;
-        }
+        // All recipes are editable - tap to edit prep time, cook time, or servings
+        return `
+            <div class="recipe-meta">
+                <div class="recipe-meta-item editable-meta" data-action="edit-prep-time">⏱️ Prep: ${recipe.prepTime || 0} min</div>
+                <div class="recipe-meta-item editable-meta" data-action="edit-cook-time">🔥 Cook: ${recipe.cookTime || 0} min</div>
+                <div class="recipe-meta-item editable-meta" data-action="edit-servings">🍽️ Servings: ${recipe.servings || 1}</div>
+            </div>
+        `;
     }
 
     /**
@@ -1122,44 +1100,25 @@ export class UIController {
     generateIngredientsHtml(ingredients) {
         if (!Array.isArray(ingredients)) return '';
 
-        const isOCRRecipe = this.currentRecipe && !this.currentRecipe.url && this.currentRecipe.recipeId;
-        const hasUrl = this.currentRecipe && this.currentRecipe.url && this.currentRecipe.url.trim().length > 0;
-        const isEditable = isOCRRecipe || (!hasUrl && this.isRecipeFromSaved);
-
+        // All recipes are editable - tap to edit ingredients
         let html = ingredients.map((ingredient, idx) => {
-            if (isEditable) {
-                // Editable version for OCR recipes (both fresh and saved)
-                return `
-                    <li class="ingredient-item editable-ingredient" data-index="${idx}">
-                        <div class="ingredient-checkbox" data-action="toggle-ingredient" data-index="${idx}"></div>
-                        <div class="ingredient-text" data-action="edit-ingredient" data-index="${idx}">
-                            <span class="ingredient-amount">${this.formatIngredientAmount(ingredient.amount)}</span>
-                            ${this.escapeHtml(ingredient.unit)} ${this.escapeHtml(ingredient.item)}
-                        </div>
-                    </li>
-                `;
-            } else {
-                // Regular version for URL recipes
-                return `
-                    <li class="ingredient-item" data-index="${idx}">
-                        <div class="ingredient-checkbox" data-action="toggle-ingredient" data-index="${idx}"></div>
-                        <div class="ingredient-text">
-                            <span class="ingredient-amount">${this.formatIngredientAmount(ingredient.amount)}</span>
-                            ${this.escapeHtml(ingredient.unit)} ${this.escapeHtml(ingredient.item)}
-                        </div>
-                    </li>
-                `;
-            }
-        }).join('');
-
-        // Add "+" button for OCR recipes
-        if (isEditable) {
-            html += `
-                <li class="add-ingredient-item">
-                    <button class="add-item-btn" data-action="add-ingredient" title="Add ingredient">+</button>
+            return `
+                <li class="ingredient-item editable-ingredient" data-index="${idx}">
+                    <div class="ingredient-checkbox" data-action="toggle-ingredient" data-index="${idx}"></div>
+                    <div class="ingredient-text" data-action="edit-ingredient" data-index="${idx}">
+                        <span class="ingredient-amount">${this.formatIngredientAmount(ingredient.amount)}</span>
+                        ${this.escapeHtml(ingredient.unit)} ${this.escapeHtml(ingredient.item)}
+                    </div>
                 </li>
             `;
-        }
+        }).join('');
+
+        // Add "+" button to add new ingredients
+        html += `
+            <li class="add-ingredient-item">
+                <button class="add-item-btn" data-action="add-ingredient" title="Add ingredient">+</button>
+            </li>
+        `;
 
         return html;
     }
@@ -1172,36 +1131,21 @@ export class UIController {
     generateInstructionsHtml(steps) {
         if (!Array.isArray(steps)) return '';
 
-        const isOCRRecipe = this.currentRecipe && !this.currentRecipe.url && this.currentRecipe.recipeId;
-        const hasUrl = this.currentRecipe && this.currentRecipe.url && this.currentRecipe.url.trim().length > 0;
-        const isEditable = isOCRRecipe || (!hasUrl && this.isRecipeFromSaved);
-
+        // All recipes are editable - tap to edit steps
         let html = steps.map((step, idx) => {
-            if (isEditable) {
-                // Editable version for OCR recipes (both fresh and saved)
-                return `
-                    <li class="step-item editable-step" data-step="${idx}" data-action="edit-step" data-index="${idx}">
-                        ${this.escapeHtml(step)}
-                    </li>
-                `;
-            } else {
-                // Regular version for URL recipes
-                return `
-                    <li class="step-item" data-step="${idx}" data-action="toggle-step">
-                        ${this.escapeHtml(step)}
-                    </li>
-                `;
-            }
-        }).join('');
-
-        // Add "+" button for OCR recipes
-        if (isEditable) {
-            html += `
-                <li class="add-step-item">
-                    <button class="add-item-btn" data-action="add-step" title="Add instruction step">+</button>
+            return `
+                <li class="step-item editable-step" data-step="${idx}" data-action="edit-step" data-index="${idx}">
+                    ${this.escapeHtml(step)}
                 </li>
             `;
-        }
+        }).join('');
+
+        // Add "+" button to add new steps
+        html += `
+            <li class="add-step-item">
+                <button class="add-item-btn" data-action="add-step" title="Add instruction step">+</button>
+            </li>
+        `;
 
         return html;
     }
@@ -1325,61 +1269,39 @@ export class UIController {
     generateStepsHtml(steps) {
         if (!Array.isArray(steps)) return '';
 
-        const isOCRRecipe = this.currentRecipe && !this.currentRecipe.url && this.currentRecipe.recipeId;
-        const hasUrl = this.currentRecipe && this.currentRecipe.url && this.currentRecipe.url.trim().length > 0;
-        const isEditable = isOCRRecipe || (!hasUrl && this.isRecipeFromSaved);
-
+        // All recipes are editable - tap to edit steps
         let html = steps.map((step, idx) => {
-            if (isEditable) {
-                // Editable version for OCR recipes (both fresh and saved)
-                return `
-                    <div class="step-item editable-step" data-step="${idx}" data-action="edit-step" data-index="${idx}">
-                        ${this.escapeHtml(step)}
-                    </div>
-                `;
-            } else {
-                // Regular version for URL recipes
-                return `
-                    <div class="step-item" data-step="${idx}" data-action="toggle-step" data-step="${idx}">
-                        ${this.escapeHtml(step)}
-                    </div>
-                `;
-            }
-        }).join('');
-
-        // Add "+" button for OCR recipes
-        if (isEditable) {
-            html += `
-                <div class="add-step-item">
-                    <button class="add-item-btn" data-action="add-step" title="Add instruction step">+</button>
+            return `
+                <div class="step-item editable-step" data-step="${idx}" data-action="edit-step" data-index="${idx}">
+                    ${this.escapeHtml(step)}
                 </div>
             `;
-        }
+        }).join('');
+
+        // Add "+" button to add new steps
+        html += `
+            <div class="add-step-item">
+                <button class="add-item-btn" data-action="add-step" title="Add instruction step">+</button>
+            </div>
+        `;
 
         return html;
     }
 
     /**
-     * Generate editing notice for OCR recipes
+     * Generate editing notice for recipes
      * @returns {string} - Editing notice HTML
      */
     generateEditingNoticeHtml() {
-        const isOCRRecipe = this.currentRecipe && !this.currentRecipe.url && this.currentRecipe.recipeId;
-        const hasUrl = this.currentRecipe && this.currentRecipe.url && this.currentRecipe.url.trim().length > 0;
-
-        // Show editing notice for OCR recipes (both fresh and saved), but not for URL-based recipes
-        if (isOCRRecipe || (!hasUrl && this.isRecipeFromSaved)) {
-            return `
-                <div class="editing-notice">
-                    <div class="editing-notice-content">
-                        <span class="editing-notice-icon">✏️</span>
-                        <span class="editing-notice-text">Tap title, times, servings, ingredients, or steps to edit ${this.isRecipeFromSaved ? '(saved OCR recipe)' : '• Use + to add missing items'}</span>
-                    </div>
+        // Show editing notice for all recipes
+        return `
+            <div class="editing-notice">
+                <div class="editing-notice-content">
+                    <span class="editing-notice-icon">✏️</span>
+                    <span class="editing-notice-text">Tap title, times, servings, ingredients, or steps to edit • Use + to add items</span>
                 </div>
-            `;
-        }
-
-        return '';
+            </div>
+        `;
     }
 
     /**
